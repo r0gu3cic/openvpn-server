@@ -1,0 +1,6 @@
+---
+- name: Reload sysctl settings
+  shell: sysctl -p
+- name: Reload UFW
+  ufw:
+    state: reloaded

@@ -1,0 +1,11 @@
+---
+username: enabler
+user_sudo_password: "{{vault_user_sudo_password}}"
+user_public_key: /home/stefan/.ssh/virtualbox.pub #the path on localhost from which playbooks are run
+journalctl_max_disk_usage: 1G
+
+# this is not used
+ca_private_key_passphrase: "{{vault_ca_private_key_passphrase}}"
+ca_common_name: dev
+
+server_common_name: openvpnserver

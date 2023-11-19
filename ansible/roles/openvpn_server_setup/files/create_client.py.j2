@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+
+# Keep in mind, Ansible/j2 vars are inside {{ '{{' }}{{ '}}' }}, python vars are inside {}
+
+import os
+import subprocess
+import sys
+
+if len(sys.argv) != 2:
+    print('''Usage: ./create_client.py <client_common_name>
+Please try again''')
+    sys.exit(1)
+
+# Set your paths and common name here
+sudo_user = '{{username}}'
+sudo_user_and_group = f'{sudo_user}:{sudo_user}'
+easyrsa_path = f'/home/{sudo_user}/easy-rsa'
+client_configs_path = f'/home/{sudo_user}/client-configs'
+client_common_name = sys.argv[1]
+
+# Generate client key and certificate request
+gen_req_command = ['./easyrsa', 'gen-req', client_common_name, 'nopass']
+subprocess.run(gen_req_command,input=b'\n', cwd=easyrsa_path)
+
+# Run the signing command with sudo
+sudo_sign_req_command = ['sudo', './easyrsa', 'sign-req', 'client', client_common_name]
+subprocess.run(sudo_sign_req_command, input=b'yes\n', cwd=easyrsa_path)
+
+# Copy client key and certificate to keys directory
+keys_dir = os.path.join(client_configs_path, 'keys')
+os.makedirs(keys_dir, exist_ok=True)
+
+crt_path = os.path.join(easyrsa_path, 'pki', 'issued', f'{client_common_name}.crt')
+key_path = os.path.join(easyrsa_path, 'pki', 'private', f'{client_common_name}.key')
+sudo_copy_crt_command = ['sudo', 'cp', crt_path, keys_dir]
+subprocess.run(sudo_copy_crt_command)
+sudo_copy_key_command = ['sudo', 'cp', key_path, keys_dir]
+subprocess.run(sudo_copy_key_command)
+
+# Copy other necessary files to keys directory
+ta_key_path = os.path.join(easyrsa_path, 'ta.key')
+ca_crt_path = os.path.join(easyrsa_path, 'pki', 'ca.crt')
+sudo_copy_ta_key_command = ['sudo', 'cp', ta_key_path, keys_dir]
+subprocess.run(sudo_copy_ta_key_command)
+sudo_copy_ca_crt_command = ['sudo', 'cp', ca_crt_path, keys_dir]
+subprocess.run(sudo_copy_ca_crt_command)
+
+# Change ownership of copied files to the sudo user
+for filename in os.listdir(keys_dir):
+    file_path = os.path.join(keys_dir, filename)
+    subprocess.run(['sudo', 'chown', sudo_user_and_group, file_path])
+
+# New paths
+new_ca_crt_path = f'/home/{sudo_user}/client-configs/keys/ca.crt'
+new_crt_path = f'/home/{sudo_user}/client-configs/keys/{client_common_name}.crt'
+new_key_path = f'/home/{sudo_user}/client-configs/keys/{client_common_name}.key'
+new_ta_key_path = f'/home/{sudo_user}/client-configs/keys/ta.key'
+
+# Create the client config file
+config_template = f'''
+client
+dev tun
+proto udp
+remote {{openvpn_server_ipv4}} 1194
+resolv-retry infinite
+nobind
+user nobody
+group nogroup
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-GCM
+verb 3
+key-direction 1
+
+# Linux client not using systemd-resolved
+; script-security 2
+; up /etc/openvpn/update-resolv-conf
+; down /etc/openvpn/update-resolv-conf
+# Linux client using systemd-resolved
+; script-security 2
+; up /etc/openvpn/update-systemd-resolved
+; down /etc/openvpn/update-systemd-resolved
+; down-pre
+; dhcp-option DOMAIN-ROUTE .
+# Keys goes below
+
+<ca>
+{open(new_ca_crt_path).read()}</ca>
+<cert>
+{open(new_crt_path).read()}</cert>
+<key>
+{open(new_key_path).read()}</key>
+<tls-crypt>
+{open(new_ta_key_path).read()}</tls-crypt>
+'''
+
+files_dir = os.path.join(client_configs_path, 'files')
+os.makedirs(files_dir, exist_ok=True)
+
+config_path = os.path.join(files_dir, f'{client_common_name}.ovpn')
+with open(config_path, 'w') as config_file:
+    config_file.write(config_template)
+
+print(f'Client configuration file created: {config_path}')

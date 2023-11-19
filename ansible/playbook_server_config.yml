@@ -1,0 +1,8 @@
+#ansible script that will configure server
+---
+- hosts: "{{ hosts }}"
+  become: true
+  roles:
+  - role: initial_server_setup
+  - role: pki_setup
+  - role: openvpn_server_setup

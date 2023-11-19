@@ -1,0 +1,58 @@
+---
+# PKI - Public Key Infrastructure
+# Install easy-rsa
+- name: Install easy-rsa
+  apt:
+    name: easy-rsa
+    state: present
+    update_cache: yes
+# Create a symbolic link to easy-rsa dir
+# Create a easy-rsa dir inside home dir
+- name: Create easy-rsa directory
+  file:
+    path: '/home/{{username}}/easy-rsa'
+    state: directory
+    owner: '{{username}}'
+    group: '{{username}}'
+    mode: '700'
+## Create symbolic link for all the files inside /usr/share/easy-rsa
+- name: Create symbolic links for easy-rsa content
+  shell: ln -s /usr/share/easy-rsa/* /home/{{username}}/easy-rsa/
+  become: true
+  become_user: '{{username}}'
+# Create PKI dir inside easy-rsa dir
+- name: Create PKI dir inside easy-rsa dir
+  shell: ./easyrsa init-pki
+  args:
+    chdir: /home/{{username}}/easy-rsa/
+  become: true
+  become_user: '{{username}}'
+# Create vars file
+- name: Create vars file
+  template:
+    src: files/vars.j2
+    dest: /home/{{username}}/easy-rsa/vars
+    owner: '{{username}}'
+    group: '{{username}}'
+    mode: '664'
+# Create CA private key with strong passphrase
+# I was able to create a good passphrase for ca private key but when I want to sign the cert for server I am not able to pass passphrase as argument
+# This was the reason why it is removed from to code
+# Bellow is the code that adds passphrase for ca private key
+  # shell: | 
+  #   (
+  #     echo "{{ca_common_name}}"
+  #     echo "{{ca_private_key_passphrase}}"
+  #     sleep 1
+  #     echo "{{ca_private_key_passphrase}}"
+  #     sleep 1
+  #   ) | ./easyrsa build-ca
+- name: Create CA private key
+  shell: | 
+    (
+      echo "{{ca_common_name}}"
+    ) | ./easyrsa build-ca nopass
+  args:
+    chdir: /home/{{username}}/easy-rsa/
+  become: true
+  become_user: '{{username}}'

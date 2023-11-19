@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+# Keep in mind, Ansible/j2 vars are inside {{ '{{' }}{{ '}}' }}, python vars are inside {}
+
+import subprocess
+import sys
+import os
+
+sudo_user = '{{username}}'
+sudo_user_and_group = f'{sudo_user}:{sudo_user}'
+
+def add_crl_verify_line_if_missing():
+    crl_verify_line = "crl-verify crl.pem"
+
+    # Use sudo to copy server.conf to a location the script can access
+    subprocess.run(['sudo', 'cp', '/etc/openvpn/server/server.conf', '/tmp/temp_server_conf'])
+    subprocess.run(['sudo', 'chown', sudo_user_and_group, '/tmp/temp_server_conf'])
+
+    server_conf_path = "/tmp/temp_server_conf"
+    with open(server_conf_path, 'r') as server_conf_file:
+        lines = server_conf_file.readlines()
+
+    found_crl_verify = any(crl_verify_line in line for line in lines)
+    if not found_crl_verify:
+        lines.append('\n' + crl_verify_line + '\n')
+
+        # Temporarily write to the same file
+        with open(server_conf_path, 'w') as temp_file:
+            temp_file.writelines(lines)
+
+        # Use sudo to move the temporary file back to the original location
+        subprocess.run(['sudo', 'mv', server_conf_path, '/etc/openvpn/server/server.conf'])
+        subprocess.run(['sudo', 'chown', 'root:root', '/etc/openvpn/server/server.conf'])
+
+def revoke_certificate(client_name):
+    easyrsa_path = f'/home/{sudo_user}/easy-rsa'
+    # Revoke client certificate
+    revoke_command = ['sudo', './easyrsa', 'revoke', client_name]
+    subprocess.run(revoke_command, input=b'yes\n', cwd=easyrsa_path)
+
+    # Generate Certificate Revocation List (CRL)
+    gen_crl_command = ['sudo', './easyrsa', 'gen-crl']
+    subprocess.run(gen_crl_command, cwd=easyrsa_path)
+
+    # Remove old CRL from OpenVPN server directory if it exists
+    crl_path = '/etc/openvpn/server/crl.pem'
+    if os.path.exists(crl_path):
+        subprocess.run(['sudo', 'rm', crl_path])
+
+    add_crl_verify_line_if_missing()
+
+    # Copy CRL to OpenVPN server directory
+    subprocess.run(['sudo', 'cp', f'/home/{sudo_user}/easy-rsa/pki/crl.pem', '/etc/openvpn/server/'])
+
+    # Restart OpenVPN server
+    subprocess.run(['sudo', 'systemctl', 'restart', 'openvpn-server@server.service'])
+
+if len(sys.argv) != 2:
+    print('''Usage: ./client_revoke.py <client_common_name>
+Please try again''')
+    sys.exit(1)
+
+client_name_to_revoke = sys.argv[1]
+revoke_certificate(client_name_to_revoke)
+print(f'{client_name_to_revoke} access is revoked')

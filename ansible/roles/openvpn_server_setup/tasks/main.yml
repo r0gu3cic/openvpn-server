@@ -1,0 +1,196 @@
+---
+# Install OpenVPN
+- name: Install OpenVPN
+  apt:
+    name: openvpn
+    state: present
+    update_cache: yes
+
+# Create keys and cert for VPN server
+## Create request for server cert
+- name: Create request for server cert
+  shell: |
+    (
+      echo "{{server_common_name}}"
+    ) | ./easyrsa gen-req {{server_common_name}} nopass
+  args:
+    chdir: /home/{{username}}/easy-rsa/
+  become: true
+  become_user: '{{username}}'
+## Sign req and generate cert for a server
+- name: Sign req and generate cert for a server
+  shell: |
+    (
+      echo "yes"
+    ) | ./easyrsa sign-req server {{server_common_name}}
+  args:
+    chdir: /home/{{username}}/easy-rsa/
+  become: true
+  become_user: '{{username}}'
+# I am not able to pass passphrase to the sign-req I had to remove passphrase from ca private key
+
+# Copy CA.crt, server.crt and server.key to the OpenVPN server dir
+- name: Copy CA.crt to the OpenVPN server dir
+  copy:
+    remote_src: true
+    src: /home/{{username}}/easy-rsa/pki/ca.crt
+    dest: /etc/openvpn/server/
+    mode: '600'
+- name: Copy {{server_common_name}}.crt to the OpenVPN server dir
+  copy:
+    remote_src: true
+    src: /home/{{username}}/easy-rsa/pki/issued/{{server_common_name}}.crt
+    dest: /etc/openvpn/server/
+    mode: '600'
+- name: Copy {{server_common_name}}.key to the OpenVPN server dir
+  copy:
+    remote_src: true
+    src: /home/{{username}}/easy-rsa/pki/private/{{server_common_name}}.key
+    dest: /etc/openvpn/server/
+    mode: '600'
+
+# Create TLS obfuscate key for initial connection between client and server
+- name: Create TLS obfuscate key for initial connection between client and server
+  shell: openvpn --genkey --secret ta.key
+  args:
+    chdir: /home/{{username}}/easy-rsa/
+  become: true
+  become_user: '{{username}}'
+# Copy created TLS obfuscate key to the OpenVPN server dir
+- name: Copy created TLS obfuscate key to the OpenVPN server dir
+  copy:
+    remote_src: true
+    src: /home/{{username}}/easy-rsa/ta.key
+    dest: /etc/openvpn/server/
+    mode: '600'
+
+# Create OpenVPN server config file
+- name: Create OpenVPN server config file
+  template:
+    src: files/server.conf.j2
+    dest: /etc/openvpn/server/server.conf
+    owner: root
+    group: root
+    mode: '600'
+
+# Network config for OpenVPN server
+- name: Change IPv4 forwarding config
+  lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^#net\.ipv4\.ip_forward=1$'
+    line: 'net.ipv4.ip_forward=1'
+  notify: 
+    - Reload sysctl settings
+# UFW config
+## Get public interface info for configuration use
+- name: Get public interface info
+  shell: ip route list default
+  register: public_interface_result
+- name: Store stdout value in a variable
+  set_fact:
+    public_interface: "{{ public_interface_result.stdout }}"
+- name: Extract interface name
+  set_fact:
+    interface_name: "{{ public_interface | regex_search('dev\\s(\\w+)', '\\1') | first }}"
+- name: Print the extracted interface name
+  debug:
+    var: interface_name
+## Change /etc/ufw/before.rules
+- name: Append lines to the /etc/ufw/before.rules file
+  lineinfile:
+    path: /etc/ufw/before.rules
+    # Following two line should find first empty line in the file and append code after it 
+    insertafter: '^$' 
+    firstmatch: true
+    line: |
+      # START OPENVPN RULES
+      # NAT table rules
+      *nat
+      :POSTROUTING ACCEPT [0:0]
+      # Allow traffic from OpenVPN client to {{interface_name}} (change to the interface you discovered!)
+      -A POSTROUTING -s 10.8.0.0/8 -o {{interface_name}} -j MASQUERADE
+      COMMIT
+      # END OPENVPN RULES
+  notify: 
+    - Reload UFW 
+# I have intentionally left default IP range
+## Change /etc/default/ufw
+- name: Change line in the /etc/default/ufw file for forwarding policy
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^DEFAULT_FORWARD_POLICY="DROP"'
+    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+  notify: 
+    - Reload UFW 
+# Allow OpenVPN ports for all the traffic (53, 80, 443, 1194)
+- name: Allow OpenVPN server udp port
+  ufw:
+    rule: allow
+    port: 1194
+    proto: udp
+  notify: 
+    - Reload UFW 
+
+# Start and enable OpenVPN server
+- name: Start and enable OpenVPN server
+  service:
+    name: openvpn-server@server.service
+    state: started
+    force: true
+    enabled: true
+
+# Create client-configs dir with keys and files subdirectories
+- name: Create client-configs/keys subdirectory
+  file:
+    path: '/home/{{username}}/client-configs/keys'
+    state: directory
+    owner: '{{username}}'
+    group: '{{username}}'
+    recurse: true
+    mode: '700'
+- name: Create client-configs/files subdirectory
+  file:
+    path: '/home/{{username}}/client-configs/files'
+    state: directory
+    owner: '{{username}}'
+    group: '{{username}}'
+    recurse: true
+    mode: '700'
+
+# Create a python script for creating a VPN user 
+## Get IPv4 address of a OpenVPN server
+# This task will gather information about machine that is configured
+# I need this for IPv4 address of a machine
+- name: Gather facts
+  setup:
+- name: Print IPv4 available facts
+  debug:
+    var: ansible_facts['all_ipv4_addresses']
+# Machine has some private IP addresses that starts with 10. so we need to remove them from the equation
+- name: Extract only public IP address of a configured machine
+  set_fact:
+    public_ipv4_address: "{{ ansible_facts['all_ipv4_addresses'] | reject('match', '^10\\.') | list }}"
+- name: Extract public IP address of a configured machine as a string
+  set_fact:
+    openvpn_server_ipv4: "{{ public_ipv4_address[0] }}"
+- name: Print IP address of a configured machine
+  debug:
+    var: openvpn_server_ipv4
+- name: Create a python script for creating a VPN user
+  template:
+    src: files/create_client.py.j2
+    dest: /home/{{username}}/create_client.py
+    owner: '{{username}}'
+    group: '{{username}}'
+    mode: '700'
+  vars:
+    openvpn_server_ipv4: "{{openvpn_server_ipv4}}"
+
+# Create a python script for revoking a VPN user 
+- name: Create a python script for revoking a VPN user
+  template:
+    src: files/revoke_client.py.j2
+    dest: /home/{{username}}/revoke_client.py
+    owner: '{{username}}'
+    group: '{{username}}'
+    mode: '700'
