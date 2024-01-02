@@ -126,7 +126,7 @@
 - name: Allow OpenVPN server udp port
   ufw:
     rule: allow
-    port: 1194
+    port: "1194"
     proto: udp
   notify: 
     - Reload UFW 
@@ -134,7 +134,7 @@
 # Start and enable OpenVPN server
 - name: Start and enable OpenVPN server
   service:
-    name: openvpn-server@server.service
+    name: openvpn@server.service
     state: started
     force: true
     enabled: true

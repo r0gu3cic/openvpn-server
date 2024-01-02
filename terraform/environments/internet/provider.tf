@@ -8,7 +8,7 @@ terraform {
 }
 
 variable "do_token" {
-  description = "DigitalOcean API token for dev env"
+  description = "DigitalOcean API token for internet env"
 }
 
 provider "digitalocean" {

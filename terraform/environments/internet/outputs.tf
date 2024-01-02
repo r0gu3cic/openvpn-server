@@ -2,9 +2,9 @@
 # we can reference data under the defined name droplet_ipv4 inside module definition
 output "droplet_ipv4" {
     description = "IPv4 address of a new droplet"
-    value = module.dev_droplet.droplet_ipv4
+    value = module.internet_droplet.droplet_ipv4
 }
 output "droplet_id" {
     description = "ID of a new droplet"
-    value = module.dev_droplet.droplet_id
+    value = module.internet_droplet.droplet_id
 }

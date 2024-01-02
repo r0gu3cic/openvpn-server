@@ -1,23 +1,23 @@
-# environments/dev/compute.tf
+# environments/internet/compute.tf
 
-# create dev droplet
-module "dev_droplet" {
+# create internet droplet
+module "internet_droplet" {
   source = "../../modules/droplet"
-  droplet_name = var.dev_droplet_name
-  droplet_size = var.dev_droplet_size
-  droplet_image = var.dev_droplet_image
-  droplet_region = var.dev_droplet_region
-  droplet_ipv6 = var.dev_droplet_ipv6
-  droplet_monitoring = var.dev_droplet_monitoring
-  droplet_backups = var.dev_droplet_backups
+  droplet_name = var.internet_droplet_name
+  droplet_size = var.internet_droplet_size
+  droplet_image = var.internet_droplet_image
+  droplet_region = var.internet_droplet_region
+  droplet_ipv6 = var.internet_droplet_ipv6
+  droplet_monitoring = var.internet_droplet_monitoring
+  droplet_backups = var.internet_droplet_backups
   # we can add ssh key that exists on a DigitalOcean account using its fingerprint
   # fingerprint stays the same if we recreate ssh resurce if the ssh key is the same
   # if we create a new, different ssh key we would need to change this fingerprint bellow
-  droplet_ssh_keys = var.dev_droplet_ssh_keys
+  droplet_ssh_keys = var.internet_droplet_ssh_keys
 }
 
 # create monitoring alerts
-resource "digitalocean_monitor_alert" "dev_cpu_alert" {
+resource "digitalocean_monitor_alert" "internet_cpu_alert" {
   alerts {
     email = [var.admin_email_address]
   }
@@ -27,9 +27,9 @@ resource "digitalocean_monitor_alert" "dev_cpu_alert" {
   window      = "5m"
   compare     = "GreaterThan"
   value       = 70
-  entities    = [module.dev_droplet.droplet_id]
+  entities    = [module.internet_droplet.droplet_id]
 }
-resource "digitalocean_monitor_alert" "dev_disk_alert" {
+resource "digitalocean_monitor_alert" "internet_disk_alert" {
   alerts {
     email = [var.admin_email_address]
   }
@@ -39,9 +39,9 @@ resource "digitalocean_monitor_alert" "dev_disk_alert" {
   window      = "5m"
   compare     = "GreaterThan"
   value       = 70
-  entities    = [module.dev_droplet.droplet_id]
+  entities    = [module.internet_droplet.droplet_id]
 }
-resource "digitalocean_monitor_alert" "dev_memory_alert" {
+resource "digitalocean_monitor_alert" "internet_memory_alert" {
   alerts {
     email = [var.admin_email_address]
   }
@@ -51,18 +51,18 @@ resource "digitalocean_monitor_alert" "dev_memory_alert" {
   window      = "5m"
   compare     = "GreaterThan"
   value       = 70
-  entities    = [module.dev_droplet.droplet_id]
+  entities    = [module.internet_droplet.droplet_id]
 }
-# create uptime check for a dev server
-resource "digitalocean_uptime_check" "dev_uptime_check" {
-  name  = var.dev_uptime_check_name
+# create uptime check for a internet server
+resource "digitalocean_uptime_check" "internet_uptime_check" {
+  name  = var.internet_uptime_check_name
   type = "ping"
-  target = module.dev_droplet.droplet_ipv4
+  target = module.internet_droplet.droplet_ipv4
   regions = ["eu_west"]
 }
-resource "digitalocean_uptime_alert" "dev_uptime_check_alert" {
-  name       = var.dev_uptime_check_alert_name
-  check_id   = digitalocean_uptime_check.dev_uptime_check.id
+resource "digitalocean_uptime_alert" "internet_uptime_check_alert" {
+  name       = var.internet_uptime_check_alert_name
+  check_id   = digitalocean_uptime_check.internet_uptime_check.id
   type       = "down"
   period     = "2m"
   notifications {
@@ -74,7 +74,7 @@ resource "digitalocean_uptime_alert" "dev_uptime_check_alert" {
 resource "null_resource" "check_droplet_stability_and_configure_droplet" {
   # check ssh connection to the droplet
   connection {
-    host = module.dev_droplet.droplet_ipv4
+    host = module.internet_droplet.droplet_ipv4
     type = "ssh"
     user = "root"
     private_key = file(var.path_to_private_key)
@@ -100,7 +100,7 @@ resource "null_resource" "check_droplet_stability_and_configure_droplet" {
     # Update the Ansible inventory file
     echo " " >> ${var.ansible_inventory_file}
     echo "[${var.ansible_inventory_group}]" >> ${var.ansible_inventory_file}
-    echo "${var.ansible_inventory_host_alias} ansible_host=${module.dev_droplet.droplet_ipv4}" >> ${var.ansible_inventory_file}
+    echo "${var.ansible_inventory_host_alias} ansible_host=${module.internet_droplet.droplet_ipv4}" >> ${var.ansible_inventory_file}
     echo " " >> ${var.ansible_inventory_file}
 
     # Remove empty lines from the Ansible inventory file

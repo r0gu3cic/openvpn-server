@@ -4,5 +4,5 @@
 module "ssh_pub_key" {
   source = "./modules/ssh_pub_key"
   ssh_pub_key_name = "ansible-configuration-key"
-  ssh_pub_key_path = file("/home/stefan/.ssh/ansible_configuration_key.pub")
+  ssh_pub_key_path = file("~/.ssh/ansible_root_configuration.pub")
 }

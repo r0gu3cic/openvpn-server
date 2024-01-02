@@ -11,23 +11,23 @@ To add SSH key to the DigitalOcean account using Terraform we need to specify wh
 `terraform init`  
 `terraform plan`  
 `terraform apply`  
-Finally we have to make sure that fingerprint of that SSH key is properly set in *terraform/environments/dev/variables.tf* file before we start with provisioning OpenVPN server, fingerprint could be found on DigitalOcean account where the SSH key is added.  
+Finally we have to make sure that fingerprint of that SSH key is properly set in *terraform/environments/internet/variables.tf* file before we start with provisioning OpenVPN server, fingerprint could be found on DigitalOcean account where the SSH key is added.  
 After that we are all set for next stage, for provisioning and configuring OpenVPN server.  
 
 ## OpenVPN server provisioning and configuration
 
-To provision and initially configure OpenVPN server we need to clone this repo, and we need to have a file with vault password (for this contact your DevOps), that *vault_pass.txt* file should be somewhere on the filesystem on local machine, make sure to change path to that file in *terraform/environments/dev/variables.tf* file.  
-Finally make sure to go through *terraform/environments/dev/variables.tf*, *ansible/inventory/host_vars/dev_vm/vars.yml* and *ansible/inventory/host_vars/dev_vm/vault.yml* files to check all the variables that will be used for server configuration such as server region, server size, username, sudo password, SSH key for that user and some other tweaks (you know vault pass because DevOps told you :smiley:).  
+To provision and initially configure OpenVPN server we need to clone this repo, and we need to have a file with vault password (for this project I have used *stefan5594* as a vault password), that *vault_pass.txt* file should be somewhere on the filesystem on local machine, make sure to change path to that file in *terraform/environments/internet/variables.tf* file.  
+Finally make sure to go through *terraform/environments/internet/variables.tf*, *ansible/inventory/host_vars/internet_vm/vars.yml* and *ansible/inventory/host_vars/internet_vm/vault.yml* files to check all the variables that will be used for server configuration such as server region, server size, username, sudo password, SSH key for that user and some other tweaks (you know the vault password because I mentioned it to you above :smiley:).  
 Lets provision and configure our OpenVPN server.  
-Move to the *terraform/environment/dev* directory  
-`cd terraform/environments/dev`  
+Move to the *terraform/environment/internet* directory  
+`cd terraform/environments/internet`  
 and to use following set of commands  
 `terraform init`  
 `terraform plan`  
 `terraform apply`  
 We will be prompted for DigitalOcean Personal access token and confirmation that we know what we are doing :smiley:  
 This will create a OpenVPN server hosted on a DigitalOcean droplet on our DigitalOcean account.  
-Generally we can tweak our server configuration in *terraform/environments/dev/variables.tf* and *ansible/inventory/host_vars/dev_vm/vars.yml* files as long as we understand what is going on.  
+Generally we can tweak our server configuration in *terraform/environments/internet/variables.tf* and *ansible/inventory/host_vars/internet_vm/vars.yml* files as long as we understand what is going on.  
 
 ## Client configuration
 
@@ -36,7 +36,7 @@ To run the script use following line after you log in to the server as a sudo us
 `./create_client.py <client_common_name>`  
 If we want to revoke certificate for certain client we can use another python script  
 `./revoke_client.py <client_common_name>`  
-To destroy this server we need to change directory to the terraform/environment/dev directory and run following command  
+To destroy this server we need to change directory to the *terraform/environment/internet* directory and run following command  
 `terraform destroy`  
 
 ## Known issues  
