@@ -134,7 +134,7 @@
 # Start and enable OpenVPN server
 - name: Start and enable OpenVPN server
   service:
-    name: openvpn@server.service
+    name: openvpn-server@server.service
     state: started
     force: true
     enabled: true

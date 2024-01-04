@@ -1,6 +1,6 @@
 port 1194
 proto udp
-internet tun
+dev tun
 ca ca.crt
 cert {{server_common_name}}.crt
 key {{server_common_name}}.key  # This file should be kept secret

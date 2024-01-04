@@ -6,6 +6,6 @@ journalctl_max_disk_usage: 1G
 
 # this is not used
 ca_private_key_passphrase: "{{vault_ca_private_key_passphrase}}"
-ca_common_name: local
+ca_common_name: ovpn-net
 
 server_common_name: openvpnserver
