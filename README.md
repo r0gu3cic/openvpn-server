@@ -16,7 +16,7 @@ After that we are all set for next stage, for provisioning and configuring OpenV
 
 ## OpenVPN server provisioning and configuration
 
-To provision and initially configure OpenVPN server we need to clone this repo, and we need to have a file with vault password (for this project I have used *stefan5594* as a vault password), that *vault_pass.txt* file should be somewhere on the filesystem on local machine, make sure to change path to that file in *terraform/environments/internet/variables.tf* file.  
+To provision and initially configure OpenVPN server we need to clone this repo, and we need to have a file with vault password (for this project, I have used *stefan5594* as a vault password. I know, I know this shouldn't be here, but it is a showcase project :man_shrugging:), that *vault_pass.txt* file should be somewhere on the filesystem on local machine, make sure to change path to that file in *terraform/environments/internet/variables.tf* file.  
 Finally make sure to go through *terraform/environments/internet/variables.tf*, *ansible/inventory/host_vars/internet_vm/vars.yml* and *ansible/inventory/host_vars/internet_vm/vault.yml* files to check all the variables that will be used for server configuration such as server region, server size, username, sudo password, SSH key for that user and some other tweaks (you know the vault password because I mentioned it to you above :smiley:).  
 Lets provision and configure our OpenVPN server.  
 Move to the *terraform/environment/internet* directory  
